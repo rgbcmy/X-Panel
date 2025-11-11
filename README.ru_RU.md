@@ -7,10 +7,10 @@
   </picture>
 </p>
 
-[![](https://img.shields.io/github/v/release/xeefei/x-panel.svg?style=for-the-badge)](https://github.com/xeefei/x-panel/releases)
-[![](https://img.shields.io/github/actions/workflow/status/xeefei/x-panel/release.yml.svg?style=for-the-badge)](https://github.com/xeefei/x-panel/actions)
-[![GO Version](https://img.shields.io/github/go-mod/go-version/xeefei/x-panel.svg?style=for-the-badge)](#)
-[![Downloads](https://img.shields.io/github/downloads/xeefei/x-panel/total.svg?style=for-the-badge)](https://github.com/xeefei/x-panel/releases/latest)
+[![](https://img.shields.io/github/v/release/rgbcmy/x-panel.svg?style=for-the-badge)](https://github.com/rgbcmy/x-panel/releases)
+[![](https://img.shields.io/github/actions/workflow/status/rgbcmy/x-panel/release.yml.svg?style=for-the-badge)](https://github.com/rgbcmy/x-panel/actions)
+[![GO Version](https://img.shields.io/github/go-mod/go-version/rgbcmy/x-panel.svg?style=for-the-badge)](#)
+[![Downloads](https://img.shields.io/github/downloads/rgbcmy/x-panel/total.svg?style=for-the-badge)](https://github.com/rgbcmy/x-panel/releases/latest)
 [![License](https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true&style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
 **3X-UI** — продвинутая панель управления с открытым исходным кодом на основе веб-интерфейса, разработанная для управления сервером Xray-core. Предоставляет удобный интерфейс для настройки и мониторинга различных VPN и прокси-протоколов.
@@ -23,10 +23,10 @@
 ## Быстрый старт
 
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/xeefei/x-panel/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/rgbcmy/x-panel/master/install.sh)
 ```
 
-Полную документацию смотрите в [вики проекта](https://github.com/xeefei/x-panel/wiki).
+Полную документацию смотрите в [вики проекта](https://github.com/rgbcmy/x-panel/wiki).
 
 ## Особая благодарность
 
@@ -53,4 +53,4 @@ bash <(curl -Ls https://raw.githubusercontent.com/xeefei/x-panel/master/install.
 
 ## Звезды с течением времени
 
-[![Stargazers over time](https://starchart.cc/xeefei/x-panel.svg?variant=adaptive)](https://starchart.cc/xeefei/x-panel) 
+[![Stargazers over time](https://starchart.cc/rgbcmy/x-panel.svg?variant=adaptive)](https://starchart.cc/rgbcmy/x-panel) 

@@ -46,7 +46,7 @@ echo -e "${yellow}〔X-Panel面板〕最新版为---------->>> ${last_version}${
 os_version=$(grep -i version_id /etc/os-release | cut -d \" -f2 | cut -d . -f1)
 
 if [[ "${release}" == "centos" ]]; then
-    if [[ ${os_version} -lt 8 ]]; then
+    if [[ ${os_version} -lt 7 ]]; then
         echo -e "${red} 请使用 CentOS 7 或更高版本 ${plain}\n" && exit 1
     fi
 elif [[ "${release}" == "ubuntu" ]]; then

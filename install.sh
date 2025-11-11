@@ -155,8 +155,8 @@ install_free_version() {
     elif [[ "${release}" == "opensuse-tumbleweed" ]]; then
         echo "您的操作系统是 OpenSUSE Tumbleweed"
     elif [[ "${release}" == "centos" ]]; then
-        if [[ ${os_version} -lt 8 ]]; then
-            echo -e "${red} 请使用 CentOS 8 或更高版本 ${plain}\n" && exit 1
+        if [[ ${os_version} -lt 7 ]]; then
+            echo -e "${red} 请使用 CentOS 7 或更高版本 ${plain}\n" && exit 1
         fi
     elif [[ "${release}" == "ubuntu" ]]; then
         if [[ ${os_version} -lt 20 ]]; then
@@ -187,7 +187,7 @@ install_free_version() {
         echo "请确保您使用的是以下受支持的操作系统之一："
         echo "- Ubuntu 20.04+"
         echo "- Debian 11+"
-        echo "- CentOS 8+"
+        echo "- CentOS 7+"
         echo "- Fedora 36+"
         echo "- Arch Linux"
         echo "- Manjaro"

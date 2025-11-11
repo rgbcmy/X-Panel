@@ -47,7 +47,7 @@ os_version=$(grep -i version_id /etc/os-release | cut -d \" -f2 | cut -d . -f1)
 
 if [[ "${release}" == "centos" ]]; then
     if [[ ${os_version} -lt 8 ]]; then
-        echo -e "${red} 请使用 CentOS 8 或更高版本 ${plain}\n" && exit 1
+        echo -e "${red} 请使用 CentOS 7 或更高版本 ${plain}\n" && exit 1
     fi
 elif [[ "${release}" == "ubuntu" ]]; then
     if [[ ${os_version} -lt 20 ]]; then
@@ -92,7 +92,7 @@ else
     echo "请确保您使用的是以下受支持的操作系统之一："
     echo "- Ubuntu 20.04+"
     echo "- Debian 11+"
-    echo "- CentOS 8+"
+    echo "- CentOS 7+"
     echo "- Fedora 36+"
     echo "- Arch Linux"
     echo "- Parch Linux"

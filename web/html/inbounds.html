@@ -6,7 +6,7 @@
     border-radius: 1rem;
     overflow-x: hidden;
   }
-  // 【新增】: 确保表格标题不换行 
+  /* // 【新增】: 确保表格标题不换行  */
   .ant-table-thead > tr > th {
       white-space: nowrap;
   }
@@ -842,7 +842,7 @@
             width: 80,
             align: 'center',
             dataIndex: 'speedLimit',
-            customRender: (text) => (text > 0 ? `${text} KB/s` : {{ i18n "pages.inbounds.unlimited" }}),
+            customRender: (text) => (text > 0 ? `${text} KB/s` : '{{ i18n "pages.inbounds.unlimited" }}'),
         },
 
         { title: '{{ i18n "pages.inbounds.expireDate" }}', width: 80, align: 'center', scopedSlots: { customRender: 'expiryTime' } },

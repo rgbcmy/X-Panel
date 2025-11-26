@@ -247,11 +247,32 @@ func (p *process) Stop() error {
 	if !p.IsRunning() {
 		return errors.New("xray is not running")
 	}
-	
+
 	if runtime.GOOS == "windows" {
 		return p.cmd.Process.Kill()
 	} else {
-		return p.cmd.Process.Signal(syscall.SIGTERM)
+		// 发送SIGTERM信号
+		err := p.cmd.Process.Signal(syscall.SIGTERM)
+		if err != nil {
+			return err
+		}
+
+		// 等待进程停止，最多等待5秒
+		done := make(chan error, 1)
+		go func() {
+			_, err := p.cmd.Process.Wait()
+			done <- err
+		}()
+
+		select {
+		case <-done:
+			// 进程正常停止
+			return nil
+		case <-time.After(5 * time.Second):
+			// 超时，强制终止
+			logger.Warning("Xray process didn't stop gracefully, killing it...")
+			return p.cmd.Process.Kill()
+		}
 	}
 }
 

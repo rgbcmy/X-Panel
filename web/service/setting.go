@@ -72,6 +72,9 @@ var defaultValueMap = map[string]string{
 	"warp":                        "",
 	"externalTrafficInformEnable": "false",
 	"externalTrafficInformURI":    "",
+	"v2boardEnable":               "false",
+	"v2boardUrl":                  "",
+	"v2boardToken":                "",
 }
 
 type SettingService struct{}
@@ -521,6 +524,10 @@ func (s *SettingService) SetExternalTrafficInformEnable(value bool) error {
 
 func (s *SettingService) GetExternalTrafficInformURI() (string, error) {
 	return s.getString("externalTrafficInformURI")
+}
+
+func (s *SettingService) GetV2boardEnable() (bool, error) {
+	return s.getBool("v2boardEnable")
 }
 
 func (s *SettingService) SetExternalTrafficInformURI(InformURI string) error {

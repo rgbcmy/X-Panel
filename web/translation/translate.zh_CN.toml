@@ -254,6 +254,10 @@
 "oneClickConfig"="一键配置"
 "is_subConversion"="订阅转换"
 "confirmCreate"="确认提交创建"
+"v2boardIntegration"="V2board 集成"
+"enableV2board"="启用 V2board"
+"nodeId"="节点 ID"
+"nodeType"="节点类型"
 
 
 [pages.client]

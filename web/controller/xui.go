@@ -3,7 +3,7 @@ package controller
 import (
 	//依赖包
 	"x-ui/web/service"
-	
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +14,8 @@ type XUIController struct {
 	serverController      *ServerController
 	settingController     *SettingController
 	xraySettingController *XraySettingController
-	serverService  service.ServerService
+	v2boardController     *V2boardController
+	serverService         service.ServerService
 }
 
 func NewXUIController(g *gin.RouterGroup) *XUIController {
@@ -37,6 +38,7 @@ func (a *XUIController) initRouter(g *gin.RouterGroup) {
 	a.serverController = NewServerController(g, a.serverService)
 	a.settingController = NewSettingController(g)
 	a.xraySettingController = NewXraySettingController(g)
+	a.v2boardController = NewV2boardController(g)
 }
 
 func (a *XUIController) index(c *gin.Context) {

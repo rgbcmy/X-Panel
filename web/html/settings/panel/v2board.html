@@ -1,0 +1,32 @@
+{{define "settings/panel/v2board"}}
+<a-collapse default-active-key="1">
+    <a-collapse-panel key="1" header='V2board Integration'>
+        <a-setting-list-item paddings="small">
+            <template #title>Enable V2board Integration</template>
+            <template #description>Enable integration with v2board panel for node configuration and user management</template>
+            <template #control>
+                <a-switch v-model="allSetting.v2boardEnable"></a-switch>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item paddings="small">
+            <template #title>V2board API URL</template>
+            <template #description>The base URL of your v2board instance (e.g., https://your-v2board.com)</template>
+            <template #control>
+                <a-input type="text" v-model="allSetting.v2boardUrl" placeholder="https://your-v2board.com"></a-input>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item paddings="small">
+            <template #title>API Token</template>
+            <template #description>The API token shared between XrayR and v2board</template>
+            <template #control>
+                <a-input-password v-model="allSetting.v2boardToken" placeholder="Enter API token"></a-input-password>
+            </template>
+        </a-setting-list-item>
+        <a-alert type="info" :style="{ marginTop: '16px' }">
+            <template #message>
+                <strong>Note:</strong> Node-specific settings (Node ID, Node Type) are configured per inbound in the inbounds page.
+            </template>
+        </a-alert>
+    </a-collapse-panel>
+</a-collapse>
+{{end}}

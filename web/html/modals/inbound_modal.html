@@ -34,6 +34,11 @@
             this.confirm = confirm;
             this.visible = true;
             this.isEdit = isEdit;
+            
+            // 确保allSetting已加载
+            if (window.modalVueInstance) {
+                window.modalVueInstance.getAllSetting();
+            }
         },
         close() {
             inModal.visible = false;
@@ -50,6 +55,7 @@
         data: {
             inModal: inModal,
             delayedStart: false,
+            allSetting: new AllSetting(),
             get inbound() {
                 return inModal.inbound;
             },
@@ -87,7 +93,17 @@
                 }
             }
         },
+        mounted() {
+            window.modalVueInstance = this;
+            this.getAllSetting();
+        },
         methods: {
+            async getAllSetting() {
+                const msg = await HttpUtil.post("/panel/setting/all");
+                if (msg.success) {
+                    this.allSetting = new AllSetting(msg.obj);
+                }
+            },
             streamNetworkChange() {
                 if (!inModal.inbound.canEnableTls()) {
                     this.inModal.inbound.stream.security = 'none';

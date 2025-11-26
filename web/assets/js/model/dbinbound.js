@@ -22,6 +22,12 @@ class DBInbound {
         this.tag = "";
         this.sniffing = "";
         this.clientStats = ""
+        
+        // v2board integration fields
+        this.v2boardEnabled = false;
+        this.v2boardNodeId = "";
+        this.v2boardNodeType = "vless";
+        
         if (data == null) {
             return;
         }

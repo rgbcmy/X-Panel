@@ -72,17 +72,13 @@
         <template slot="label">
             <a-tooltip>
                 <template slot="title">
-                {{ i18n "pages.inbounds.deviceLimitDesc" }}
+                    {{ i18n "pages.inbounds.deviceLimitDesc" }}
                 </template>
                 {{ i18n "pages.inbounds.deviceLimit" }}
                 <a-icon type="question-circle"></a-icon>
             </a-tooltip>
         </template>
-        <a-input-number
-            v-model.number="dbInbound.deviceLimit"
-            :min="0"
-            style="width: 100%"
-            placeholder="0 = 不限制" />
+        <a-input-number v-model.number="dbInbound.deviceLimit" :min="0" style="width: 100%" placeholder="0 = 不限制" />
     </a-form-item>
 
     <!-- 到期时间 -->
@@ -160,6 +156,27 @@
 <a-collapse>
     <a-collapse-panel header='Sniffing'>
         {{template "form/sniffing"}}
+    </a-collapse-panel>
+</a-collapse>
+
+<!-- v2board integration -->
+<a-collapse v-if="allSetting.v2boardEnable">
+    <a-collapse-panel header="V2board 集成">
+        <a-form-item label="启用 V2board">
+            <a-switch v-model="dbInbound.v2boardEnabled"></a-switch>
+        </a-form-item>
+        <a-form-item label="节点 ID" v-if="dbInbound.v2boardEnabled">
+            <a-input v-model.trim="dbInbound.v2boardNodeId"
+                placeholder="节点 ID from v2board"></a-input>
+        </a-form-item>
+        <a-form-item label="节点类型" v-if="dbInbound.v2boardEnabled">
+            <a-select v-model="dbInbound.v2boardNodeType" :dropdown-class-name="themeSwitcher.currentTheme">
+                <a-select-option value="vless">VLESS</a-select-option>
+                <a-select-option value="vmess">VMess</a-select-option>
+                <a-select-option value="trojan">Trojan</a-select-option>
+                <a-select-option value="shadowsocks">Shadowsocks</a-select-option>
+            </a-select>
+        </a-form-item>
     </a-collapse-panel>
 </a-collapse>
 

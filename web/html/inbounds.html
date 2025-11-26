@@ -737,6 +737,7 @@
 <script src="{{ .base_path }}assets/uri/URI.min.js?{{ .cur_ver }}"></script>
 <script src="{{ .base_path }}assets/js/model/inbound.js?{{ .cur_ver }}"></script>
 <script src="{{ .base_path }}assets/js/model/dbinbound.js?{{ .cur_ver }}"></script>
+<script src="{{ .base_path }}assets/js/model/setting.js?{{ .cur_ver }}"></script>
 {{template "component/aSidebar" .}}
 {{template "component/aThemeSwitch" .}}
 {{template "component/aCustomStatistic" .}}
@@ -893,6 +894,7 @@
             showAlert: false,
             ipLimitEnable: false,
             pageSize: 50,
+            allSetting: new AllSetting(),
 			
             // 【中文注释】: 新增数据属性，用于控制“一键配置”模态框的显示状态
             oneClickModalVisible: false,
@@ -969,6 +971,12 @@
                     this.remarkModel = remarkModel;
                     this.datepicker = datepicker;
                     this.ipLimitEnable = ipLimitEnable;
+                }
+
+                // 获取完整的设置以支持v2board
+                const allSettingsMsg = await HttpUtil.post('/panel/setting/all');
+                if (allSettingsMsg.success) {
+                    this.allSetting = new AllSetting(allSettingsMsg.obj);
                 }
             },
             setInbounds(dbInbounds) {
@@ -1450,6 +1458,10 @@ async openPort(port) {
 
                    // 新增这一行
                    deviceLimit: dbInbound.deviceLimit,
+                   // v2board integration
+                   v2boardEnabled: dbInbound.v2boardEnabled,
+                   v2boardNodeId: dbInbound.v2boardNodeId,
+                   v2boardNodeType: dbInbound.v2boardNodeType,
 
                     listen: inbound.listen,
                     port: inbound.port,
@@ -1475,6 +1487,10 @@ async openPort(port) {
                     expiryTime: dbInbound.expiryTime,
                    // 新增这一行
                    deviceLimit: dbInbound.deviceLimit,
+                   // v2board integration
+                   v2boardEnabled: dbInbound.v2boardEnabled,
+                   v2boardNodeId: dbInbound.v2boardNodeId,
+                   v2boardNodeType: dbInbound.v2boardNodeType,
 
                     listen: inbound.listen,
                     port: inbound.port,

@@ -48,6 +48,9 @@ class AllSetting {
         this.subJsonRules = "";
 
         this.timeLocation = "Local";
+        this.v2boardEnable = false;
+        this.v2boardUrl = "";
+        this.v2boardToken = "";
 
         if (data == null) {
             return

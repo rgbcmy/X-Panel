@@ -98,12 +98,22 @@ func (j *V2boardSyncJob) syncInboundUsers(inbound *model.Inbound, allSetting *en
 		}
 	}
 
-	// Update inbound settings with new client list
-	if len(updatedClients) > 0 {
-		return j.updateInboundClients(inbound, updatedClients)
+	// Disable clients not in V2board list
+	v2boardEmails := make(map[string]bool)
+	for _, user := range userList.Users {
+		v2boardEmails[user.Email] = true
 	}
 
-	return nil
+	for _, client := range currentClients {
+		if !v2boardEmails[client.Email] {
+			client.Enable = false
+			updatedClients = append(updatedClients, client)
+			logger.Info("disabled client", client.Email, "in inbound", inbound.Id, "as not in V2board")
+		}
+	}
+
+	// Update inbound settings with new client list
+	return j.updateInboundClients(inbound, updatedClients)
 }
 
 func (j *V2boardSyncJob) updateInboundClients(inbound *model.Inbound, clients []model.Client) error {

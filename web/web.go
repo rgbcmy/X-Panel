@@ -306,8 +306,8 @@ func (s *Server) startTask() {
 
 	go func() {
 		time.Sleep(time.Second * 5)
-		// Statistics every 10 seconds, start the delay for 5 seconds for the first time, and staggered with the time to restart xray
-		s.cron.AddJob("@every 10s", job.NewXrayTrafficJob())
+		// Statistics every 1 minute, start the delay for 5 seconds for the first time, and staggered with the time to restart xray
+		s.cron.AddJob("@every 1m", job.NewXrayTrafficJob())
 	}()
 
 	// check client ips from log file every 10 sec
@@ -316,8 +316,8 @@ func (s *Server) startTask() {
 	// check client ips from log file every day
 	s.cron.AddJob("@daily", job.NewClearLogsJob())
 
-	// Sync v2board users every 5 minutes
-	s.cron.AddJob("@every 5m", job.NewV2boardSyncJob())
+	// Sync v2board users every 1 minute
+	s.cron.AddJob("@every 1m", job.NewV2boardSyncJob())
 
 	// Make a traffic condition every day, 8:30
 	var entry cron.EntryID

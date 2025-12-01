@@ -93,14 +93,14 @@ func (j *XrayTrafficJob) reportTrafficToV2board(clientTraffics []*xray.ClientTra
 
 	for _, clientTraffic := range clientTraffics {
 		// Find the inbound for this client
-		traffic, inbound, err := j.inboundService.GetClientInboundByTrafficID(clientTraffic.Id)
+		traffic, inbound, err := j.inboundService.GetClientInboundByEmail(clientTraffic.Email)
 		if err != nil {
-			logger.Warning("get inbound for client", clientTraffic.Id, "failed:", err)
+			logger.Warning("get inbound for client", clientTraffic.Email, "failed:", err)
 			continue
 		}
 
 		// Check if this inbound has v2board enabled
-		if !inbound.V2boardEnabled || inbound.V2boardNodeId == "" {
+		if inbound == nil || !inbound.V2boardEnabled || inbound.V2boardNodeId == "" {
 			continue
 		}
 

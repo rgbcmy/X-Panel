@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch X-Panel",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/main.go",
+            "env": {
+                "XUI_DB_FOLDER": "${workspaceFolder}/x-ui",
+                "XUI_LOG_FOLDER": "${workspaceFolder}/x-ui/log",
+                "XUI_BIN_FOLDER": "${workspaceFolder}/x-ui/bin"
+            },
+            "args": []
+        }
+    ]
+}

@@ -260,3 +260,93 @@ jobs:
           # 〔中文注释〕: 在 Release 页面显示的资产名称
           asset_name: x-ui-windows-${{ matrix.platform }}.zip
           prerelease: true
+
+  # ===============================================================
+  # 【新增】macOS 平台的构建任务
+  # ===============================================================
+  build-macos:
+    name: Build for macOS
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        # 〔中文注释〕: macOS 支持 Intel (amd64) 和 Apple Silicon (arm64)
+        platform:
+          - amd64
+          - arm64
+    # 〔中文注释〕: 使用 macOS 最新版本的虚拟环境
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Build X-Panel for macOS
+        run: |
+          export CGO_ENABLED=1
+          export GOOS=darwin
+          export GOARCH=${{ matrix.platform }}
+          
+          # 〔中文注释〕: 编译 macOS 版本（使用 native CGO）
+          go build -ldflags "-w -s" -o xui-release -v main.go
+          
+          # 〔中文注释〕: 验证二进制文件
+          file xui-release
+          
+          # 〔中文注释〕: 创建打包目录
+          mkdir x-ui
+          cp xui-release x-ui/
+          cp x-ui.sh x-ui/
+          mv x-ui/xui-release x-ui/x-ui
+          mkdir x-ui/bin
+          cd x-ui/bin
+          
+          # 〔中文注释〕: 下载 macOS 版本的 Xray-core 依赖
+          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v25.10.15/"
+          if [ "${{ matrix.platform }}" == "amd64" ]; then
+            curl -L -o xray.zip ${Xray_URL}Xray-macos-64.zip
+          elif [ "${{ matrix.platform }}" == "arm64" ]; then
+            curl -L -o xray.zip ${Xray_URL}Xray-macos-arm64-v8a.zip
+          fi
+          
+          # 〔中文注释〕: 解压 xray
+          unzip -q xray.zip
+          rm -f xray.zip
+          
+          # 〔中文注释〕: 下载 geo 数据文件
+          rm -f geoip.dat geosite.dat
+          curl -L -o geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+          curl -L -o geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+          curl -L -o geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
+          curl -L -o geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
+          curl -L -o geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
+          curl -L -o geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+          
+          # 〔中文注释〕: 重命名 xray 二进制文件（根据 X-Panel 的命名规则）
+          mv xray xray-darwin-${{ matrix.platform }}
+          
+          cd ../..
+
+      - name: Package to tar.gz
+        run: tar -zcvf x-ui-macos-${{ matrix.platform }}.tar.gz x-ui
+
+      - name: Upload files to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-ui-macos-${{ matrix.platform }}
+          path: ./x-ui-macos-${{ matrix.platform }}.tar.gz
+
+      - name: Upload files to GH release
+        uses: svenstaro/upload-release-action@v2
+        if: github.event_name == 'release' && github.event.action == 'published'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref }}
+          file: x-ui-macos-${{ matrix.platform }}.tar.gz
+          asset_name: x-ui-macos-${{ matrix.platform }}.tar.gz
+          prerelease: true

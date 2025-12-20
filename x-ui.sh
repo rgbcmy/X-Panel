@@ -1044,25 +1044,83 @@ ssl_cert_issue() {
         mkdir -p "$certPath"
     fi
 
-    # 获取独立服务器的端口号
-    local WebPort=80
-    read -rp "请选择要使用的端口 (默认为 80): " WebPort
-    if [[ ${WebPort} -gt 65535 || ${WebPort} -lt 1 ]]; then
-        LOGE "您输入的 ${WebPort} 无效，将使用默认端口 80。"
-        WebPort=80
-    fi
-    LOGI "将使用端口: ${WebPort} 来签发证书。请确保此端口已开放。"
-
-    # 签发证书
+    # 选择证书申请模式
     echo ""
-    ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --force
-    if [ $? -ne 0 ]; then
-        LOGE "签发证书失败，请检查日志。"
-        rm -rf ~/.acme.sh/${domain}
-        exit 1
+    LOGI "请选择证书申请模式:"
+    echo "1. webroot 模式 (推荐，适用于已有nginx等web服务器)"
+    echo "2. standalone 模式 (适用于无web服务器，需要占用80端口)"
+    read -rp "请输入选项 [1-2，默认1]: " cert_mode
+    cert_mode=${cert_mode:-1}
+
+    if [ "$cert_mode" == "1" ]; then
+        # webroot 模式
+        echo ""
+        LOGI "使用 webroot 模式申请证书"
+        
+        # 获取 webroot 路径
+        local webroot_path="/var/www/html"
+        read -rp "请输入 nginx 的 webroot 路径 (默认: /var/www/html): " input_webroot
+        if [ -n "$input_webroot" ]; then
+            webroot_path="$input_webroot"
+        fi
+        
+        # 检查 webroot 路径是否存在
+        if [ ! -d "$webroot_path" ]; then
+            LOGW "webroot 路径不存在，正在创建: $webroot_path"
+            mkdir -p "$webroot_path"
+            if [ $? -ne 0 ]; then
+                LOGE "创建 webroot 路径失败，请检查权限"
+                exit 1
+            fi
+        fi
+        
+        # 确保 .well-known/acme-challenge 目录可写
+        local acme_dir="$webroot_path/.well-known/acme-challenge"
+        mkdir -p "$acme_dir"
+        chmod 755 "$acme_dir"
+        
+        LOGI "webroot 路径: ${webroot_path}"
+        LOGI "请确保 nginx 配置允许访问 .well-known/acme-challenge/ 路径"
+        echo ""
+        
+        # 签发证书
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+        ~/.acme.sh/acme.sh --issue -d ${domain} --webroot ${webroot_path} --force
+        if [ $? -ne 0 ]; then
+            LOGE "签发证书失败，请检查:"
+            LOGE "1. nginx 是否正常运行"
+            LOGE "2. 域名是否正确解析到本机"
+            LOGE "3. nginx 配置是否允许访问 .well-known 目录"
+            rm -rf ~/.acme.sh/${domain}
+            exit 1
+        else
+            LOGI "签发证书成功，正在安装证书..."
+        fi
     else
-        LOGE "签发证书成功，正在安装证书..."
+        # standalone 模式
+        echo ""
+        LOGI "使用 standalone 模式申请证书"
+        
+        # 获取独立服务器的端口号
+        local WebPort=80
+        read -rp "请选择要使用的端口 (默认为 80): " WebPort
+        if [[ ${WebPort} -gt 65535 || ${WebPort} -lt 1 ]]; then
+            LOGE "您输入的 ${WebPort} 无效，将使用默认端口 80。"
+            WebPort=80
+        fi
+        LOGI "将使用端口: ${WebPort} 来签发证书。请确保此端口已开放且未被占用。"
+        
+        # 签发证书
+        echo ""
+        ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+        ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --force
+        if [ $? -ne 0 ]; then
+            LOGE "签发证书失败，请检查日志。"
+            rm -rf ~/.acme.sh/${domain}
+            exit 1
+        else
+            LOGI "签发证书成功，正在安装证书..."
+        fi
     fi
 
     # --- 自动设置 reloadCmd ---

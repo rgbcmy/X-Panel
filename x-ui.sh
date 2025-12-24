@@ -838,7 +838,7 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     2) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /etc/x-ui/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
         if [ -z "$domains" ]; then 
             echo "未找到可撤销的证书。" 
         else 
@@ -855,7 +855,7 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     3) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /etc/x-ui/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
         if [ -z "$domains" ]; then 
             echo "未找到可更新的证书。" 
         else 
@@ -872,14 +872,14 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     4) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /etc/x-ui/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
         if [ -z "$domains" ]; then 
             echo "未找到证书。" 
         else 
             echo "现有域名及其路径：" 
             for domain in $domains; do 
-                local cert_path="/root/cert/${domain}/fullchain.pem" 
-                local key_path="/root/cert/${domain}/privkey.pem" 
+                local cert_path="/etc/x-ui/cert/${domain}/fullchain.pem" 
+                local key_path="/etc/x-ui/cert/${domain}/privkey.pem" 
                 if [[ -f "${cert_path}" && -f "${key_path}" ]]; then 
                     echo -e "域名：${domain}" 
                     echo -e "\t证书路径：${cert_path}" 
@@ -892,7 +892,7 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     5) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /etc/x-ui/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
         if [ -z "$domains" ]; then 
             echo "未找到证书。" 
         else 
@@ -901,8 +901,8 @@ ssl_cert_issue_main() {
             read -rp "请选择要为面板设置证书路径的域名：" domain 
  
             if echo "$domains" | grep -qw "$domain"; then 
-                local webCertFile="/root/cert/${domain}/fullchain.pem" 
-                local webKeyFile="/root/cert/${domain}/privkey.pem" 
+                local webCertFile="/etc/x-ui/cert/${domain}/fullchain.pem" 
+                local webKeyFile="/etc/x-ui/cert/${domain}/privkey.pem" 
  
                 if [[ -f "${webCertFile}" && -f "${webKeyFile}" ]]; then 
                     /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile" 
@@ -1036,7 +1036,7 @@ ssl_cert_issue() {
 
     # 为证书创建一个目录
     echo ""
-    certPath="/root/cert/${domain}"
+    certPath="/etc/x-ui/cert/${domain}"
     if [ ! -d "$certPath" ]; then
         mkdir -p "$certPath"
     else
@@ -1131,8 +1131,8 @@ ssl_cert_issue() {
     # 安装证书
     echo ""
     ~/.acme.sh/acme.sh --installcert -d ${domain} \
-        --key-file /root/cert/${domain}/privkey.pem \
-        --fullchain-file /root/cert/${domain}/fullchain.pem \
+        --key-file /etc/x-ui/cert/${domain}/privkey.pem \
+        --fullchain-file /etc/x-ui/cert/${domain}/fullchain.pem \
         --reloadcmd "${reloadCmd}"
 
     echo ""
@@ -1150,18 +1150,22 @@ ssl_cert_issue() {
     if [ $? -ne 0 ]; then
         LOGE "自动续订失败，证书详情："
         ls -lah cert/*
-        chmod 755 $certPath/*
+        chmod 755 $certPath
+        chmod 644 $certPath/fullchain.pem
+        chmod 600 $certPath/privkey.pem
         exit 1
     else
         LOGI "自动续订成功，证书详情："
         ls -lah cert/*
-        chmod 755 $certPath/*
+        chmod 755 $certPath
+        chmod 644 $certPath/fullchain.pem
+        chmod 600 $certPath/privkey.pem
     fi
 
     # ---  自动为面板设置证书路径  ---
     echo ""
-    local webCertFile="/root/cert/${domain}/fullchain.pem"
-    local webKeyFile="/root/cert/${domain}/privkey.pem"
+    local webCertFile="/etc/x-ui/cert/${domain}/fullchain.pem"
+    local webKeyFile="/etc/x-ui/cert/${domain}/privkey.pem"
 
     if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then
         /usr/local/x-ui/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
@@ -1253,7 +1257,7 @@ ssl_cert_issue_CF() {
         
         # 为证书创建一个目录
         echo ""
-        certPath="/root/cert/${CF_Domain}"
+        certPath="/etc/x-ui/cert/${CF_Domain}"
         if [ -d "$certPath" ]; then
             rm -rf ${certPath}
         fi
@@ -1400,10 +1404,10 @@ fi
 
 # --------- 拷贝X-Panel已有证书到 Nginx ----------
 mkdir -p /etc/nginx/ssl
-acme_path="/root/.acme.sh/${domain}_ecc"
 
-cp "${acme_path}/fullchain.cer" "/etc/nginx/ssl/${domain}.cer"
-cp "${acme_path}/${domain}.key" "/etc/nginx/ssl/${domain}.key"
+# 从统一的证书目录拷贝
+cp "/etc/x-ui/cert/${domain}/fullchain.pem" "/etc/nginx/ssl/${domain}.cer"
+cp "/etc/x-ui/cert/${domain}/privkey.pem" "/etc/nginx/ssl/${domain}.key"
 
 
 # --------- 配置 Nginx 反向代理 ----------

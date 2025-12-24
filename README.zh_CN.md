@@ -229,7 +229,7 @@ VERSION=v25.11.11 && bash <(curl -Ls "https://raw.githubusercontent.com/rgbcmy/x
 ![12](./media/12.png)
 ##### PS：把之前通过自动备份下载得到的两个文件上传覆盖掉旧文件，重启〔X-Panel面板〕即可【迁移成功】；即使迁移过程中出现问题，你是有备份文件的，不用担心，多试几次。
 ![13](./media/13.png)
-#### 五、若安装了证书，去核对/更改一下证书的路径，一般是同一个域名的话，位置在：/root/cert/域名/fullchain.pem，路径是相同的就不用更改，
+#### 五、若安装了证书，去核对/更改一下证书的路径，一般是同一个域名的话，位置在：/etc/x-ui/cert/域名/fullchain.pem，路径是相同的就不用更改，
 #### 六、重启面板/重启服务器，让上述步骤生效即可，这时可以看到所有配置都是之前自己常用的，包括面板用户名、密码，入站、客户端，电报机器人配置等。
 
 ------------
@@ -489,7 +489,7 @@ systemctl restart x-ui
    docker run -itd \
       -e XRAY_VMESS_AEAD_FORCED=false \
       -v $PWD/db/:/etc/x-ui/ \
-      -v $PWD/cert/:/root/cert/ \
+      -v $PWD/cert/:/etc/x-ui/cert/ \
       --network=host \
       --restart=unless-stopped \
       --name x-panel \

@@ -7,7 +7,7 @@ services:
     # hostname: yourhostname <<--- optional
     volumes:
       - $PWD/db/:/etc/x-ui/
-      - $PWD/cert/:/root/cert/
+      - $PWD/cert/:/etc/x-ui/cert/
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
       XUI_ENABLE_FAIL2BAN: "true"

@@ -13,7 +13,6 @@ import (
 	"x-ui/config"
 	"x-ui/database/model"
 	"x-ui/util/crypto"
-	"x-ui/xray"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -27,18 +26,175 @@ const (
 	defaultPassword = "admin"
 )
 
+// fixClientTrafficsInboundId 为旧数据的 inbound_id 设置默认值
+// 这个函数在 AutoMigrate 之前执行，确保所有记录都有有效的 inbound_id
+func fixClientTrafficsInboundId() error {
+	log.Println("Checking client_traffics table for inbound_id issues...")
+
+	// 检查表是否存在
+	var tableCount int64
+	err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='client_traffics'").Scan(&tableCount).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果表不存在，跳过
+	if tableCount == 0 {
+		log.Println("client_traffics table does not exist, will be created by AutoMigrate")
+		return nil
+	}
+
+	log.Println("client_traffics table exists, checking for inbound_id column...")
+
+	// 检查是否有 inbound_id 列
+	var columnCount int64
+	err = db.Raw("SELECT COUNT(*) FROM pragma_table_info('client_traffics') WHERE name='inbound_id'").Scan(&columnCount).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果没有 inbound_id 列，说明是旧表，需要添加并设置默认值
+	if columnCount == 0 {
+		log.Println("inbound_id column does not exist, adding it with default value 1...")
+		// 使用 DEFAULT 1 添加列，这样所有现有行都会自动获得值 1
+		err = db.Exec("ALTER TABLE client_traffics ADD COLUMN inbound_id INTEGER NOT NULL DEFAULT 1").Error
+		if err != nil {
+			log.Printf("Failed to add inbound_id column: %v", err)
+			return err
+		}
+		log.Println("inbound_id column added successfully with default value 1")
+
+		// 验证添加是否成功
+		var verifyCount int64
+		db.Raw("SELECT COUNT(*) FROM client_traffics WHERE inbound_id = 1").Scan(&verifyCount)
+		log.Printf("Verified: %d records now have inbound_id = 1", verifyCount)
+
+		return nil
+	}
+
+	log.Println("inbound_id column exists, checking for NULL or 0 values...")
+
+	// 如果列已存在，检查并更新 NULL 或 0 的值
+	var nullCount int64
+	err = db.Raw("SELECT COUNT(*) FROM client_traffics WHERE inbound_id IS NULL OR inbound_id = 0").Scan(&nullCount).Error
+	if err != nil {
+		return err
+	}
+
+	if nullCount > 0 {
+		log.Printf("Found %d records with NULL or 0 inbound_id, updating to 1...", nullCount)
+		result := db.Exec("UPDATE client_traffics SET inbound_id = 1 WHERE inbound_id IS NULL OR inbound_id = 0")
+		if result.Error != nil {
+			log.Printf("Failed to update inbound_id: %v", result.Error)
+			return result.Error
+		}
+		log.Printf("Successfully updated %d records with default inbound_id = 1", result.RowsAffected)
+	} else {
+		log.Println("All records have valid inbound_id values")
+	}
+
+	return nil
+}
+
+// ensureClientTrafficsSchema 确保 client_traffics 表的结构和索引正确
+func ensureClientTrafficsSchema() error {
+	log.Println("Ensuring client_traffics table schema...")
+
+	// 检查表是否存在
+	var tableCount int64
+	err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='client_traffics'").Scan(&tableCount).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果表不存在，创建它
+	if tableCount == 0 {
+		log.Println("Creating client_traffics table...")
+		err = db.Exec(`
+			CREATE TABLE client_traffics (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				inbound_id INTEGER NOT NULL DEFAULT 1,
+				enable INTEGER NOT NULL,
+				email TEXT NOT NULL,
+				up INTEGER NOT NULL,
+				down INTEGER NOT NULL,
+				all_time INTEGER NOT NULL,
+				expiry_time INTEGER NOT NULL,
+				total INTEGER NOT NULL,
+				reset INTEGER NOT NULL DEFAULT 0,
+				last_online INTEGER NOT NULL DEFAULT 0
+			)
+		`).Error
+		if err != nil {
+			log.Printf("Failed to create client_traffics table: %v", err)
+			return err
+		}
+		log.Println("client_traffics table created successfully")
+	}
+
+	// 检查联合唯一索引是否存在
+	var indexCount int64
+	err = db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_inbound_email'").Scan(&indexCount).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果索引不存在，创建它
+	if indexCount == 0 {
+		log.Println("Creating unique index idx_inbound_email on client_traffics...")
+		err = db.Exec("CREATE UNIQUE INDEX idx_inbound_email ON client_traffics(inbound_id, email)").Error
+		if err != nil {
+			log.Printf("Failed to create unique index: %v", err)
+			return err
+		}
+		log.Println("Unique index idx_inbound_email created successfully")
+	} else {
+		log.Println("Unique index idx_inbound_email already exists")
+	}
+
+	// 检查旧的 email 唯一索引是否存在，如果存在则删除
+	var oldIndexCount int64
+	err = db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE '%email%' AND name != 'idx_inbound_email' AND tbl_name='client_traffics'").Scan(&oldIndexCount).Error
+	if err == nil && oldIndexCount > 0 {
+		// 获取旧索引的名称
+		var oldIndexName string
+		db.Raw("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE '%email%' AND name != 'idx_inbound_email' AND tbl_name='client_traffics' LIMIT 1").Scan(&oldIndexName)
+		if oldIndexName != "" {
+			log.Printf("Dropping old email unique index: %s", oldIndexName)
+			db.Exec("DROP INDEX IF EXISTS " + oldIndexName)
+		}
+	}
+
+	log.Println("client_traffics table schema is correct")
+	return nil
+}
+
 func initModels() error {
+	// 在 AutoMigrate 之前，确保旧数据有有效的 inbound_id
+	if err := fixClientTrafficsInboundId(); err != nil {
+		log.Printf("Error fixing client_traffics inbound_id: %v", err)
+		return err
+	}
+
+	// 手动确保 client_traffics 表结构正确（包括索引）
+	if err := ensureClientTrafficsSchema(); err != nil {
+		log.Printf("Error ensuring client_traffics schema: %v", err)
+		return err
+	}
+
+	// 对其他表使用 AutoMigrate
 	models := []any{
 		&model.User{},
 		&model.Inbound{},
 		&model.OutboundTraffics{},
 		&model.Setting{},
 		&model.InboundClientIps{},
-		&xray.ClientTraffic{},
+		// &xray.ClientTraffic{}, // 手动处理，不使用 AutoMigrate
 		&model.HistoryOfSeeders{},
-		&LinkHistory{},   // 把 LinkHistory 表也迁移
-		&model.LotteryWin{},  // 新增 抽奖游戏LotteryWin 数据模型
+		&LinkHistory{},      // 把 LinkHistory 表也迁移
+		&model.LotteryWin{}, // 新增 抽奖游戏LotteryWin 数据模型
 	}
+
 	for _, model := range models {
 		if err := db.AutoMigrate(model); err != nil {
 			log.Printf("Error auto migrating model: %v", err)

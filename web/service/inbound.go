@@ -527,7 +527,7 @@ func (s *InboundService) updateClientTraffics(tx *gorm.DB, oldInbound *model.Inb
 			}
 		}
 		if !emailExists {
-			err = s.DelClientStat(tx, oldClient.Email)
+			err = s.DelClientStat(tx, oldInbound.Id, oldClient.Email)
 			if err != nil {
 				return err
 			}
@@ -740,12 +740,12 @@ func (s *InboundService) DelInboundClient(inboundId int, clientId string) (bool,
 
 	if len(email) > 0 {
 		notDepleted := true
-		err = db.Model(xray.ClientTraffic{}).Select("enable").Where("email = ?", email).First(&notDepleted).Error
+		err = db.Model(xray.ClientTraffic{}).Select("enable").Where("inbound_id = ? AND email = ?", inboundId, email).First(&notDepleted).Error
 		if err != nil {
 			logger.Error("Get stats error")
 			return false, err
 		}
-		err = s.DelClientStat(db, email)
+		err = s.DelClientStat(db, inboundId, email)
 		if err != nil {
 			logger.Error("Delete stats Data Error")
 			return false, err
@@ -885,7 +885,7 @@ func (s *InboundService) UpdateInboundClient(data *model.Inbound, clientId strin
 
 	if len(clients[0].Email) > 0 {
 		if len(oldEmail) > 0 {
-			err = s.UpdateClientStat(tx, oldEmail, &clients[0])
+			err = s.UpdateClientStat(tx, data.Id, oldEmail, &clients[0])
 			if err != nil {
 				return false, err
 			}
@@ -897,7 +897,7 @@ func (s *InboundService) UpdateInboundClient(data *model.Inbound, clientId strin
 			s.AddClientStat(tx, data.Id, &clients[0])
 		}
 	} else {
-		err = s.DelClientStat(tx, oldEmail)
+		err = s.DelClientStat(tx, data.Id, oldEmail)
 		if err != nil {
 			return false, err
 		}
@@ -1356,9 +1356,9 @@ func (s *InboundService) AddClientStat(tx *gorm.DB, inboundId int, client *model
 	return err
 }
 
-func (s *InboundService) UpdateClientStat(tx *gorm.DB, email string, client *model.Client) error {
+func (s *InboundService) UpdateClientStat(tx *gorm.DB, inboundId int, email string, client *model.Client) error {
 	result := tx.Model(xray.ClientTraffic{}).
-		Where("email = ?", email).
+		Where("inbound_id = ? AND email = ?", inboundId, email).
 		Updates(map[string]any{
 			"enable":      true,
 			"email":       client.Email,
@@ -1374,8 +1374,8 @@ func (s *InboundService) UpdateClientIPs(tx *gorm.DB, oldEmail string, newEmail 
 	return tx.Model(model.InboundClientIps{}).Where("client_email = ?", oldEmail).Update("client_email", newEmail).Error
 }
 
-func (s *InboundService) DelClientStat(tx *gorm.DB, email string) error {
-	return tx.Where("email = ?", email).Delete(xray.ClientTraffic{}).Error
+func (s *InboundService) DelClientStat(tx *gorm.DB, inboundId int, email string) error {
+	return tx.Where("inbound_id = ? AND email = ?", inboundId, email).Delete(xray.ClientTraffic{}).Error
 }
 
 func (s *InboundService) DelClientIPs(tx *gorm.DB, email string) error {

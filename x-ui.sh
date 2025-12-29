@@ -1880,7 +1880,7 @@ show_menu() {
 
 -------------->>>>>>>赞 助 推 广 区<<<<<<<<-------------------
 
-${green}1、搬瓦工GIA高端线路：${yellow}https://bandwagonhost.com/aff.php?aff=75015${plain}
+${green}1、搬瓦工GIA高端线路：${yellow}https://bandwagonhost.com/aff.php?aff=52534${plain}
 
 ${green}2、Dmit高端GIA线路：${yellow}https://www.dmit.io/aff.php?aff=9326${plain}
 

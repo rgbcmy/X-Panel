@@ -130,6 +130,73 @@ func ensureClientTrafficsSchema() error {
 			return err
 		}
 		log.Println("client_traffics table created successfully")
+	} else {
+		// 表已存在，检查是否需要重建（删除旧的 uni_client_traffics_email 约束）
+		log.Println("Checking for old unique constraint on email column...")
+		var constraintSQL string
+		db.Raw("SELECT sql FROM sqlite_master WHERE type='table' AND name='client_traffics'").Scan(&constraintSQL)
+
+		// 如果表定义中包含旧的 uni_client_traffics_email 约束，需要重建表
+		if len(constraintSQL) > 0 && (db.Raw("SELECT sql FROM sqlite_master WHERE type='table' AND name='client_traffics' AND sql LIKE '%uni_client_traffics_email%'").Scan(&constraintSQL).Error == nil && constraintSQL != "") {
+			log.Println("Found old uni_client_traffics_email constraint, rebuilding table...")
+
+			// 开始事务
+			tx := db.Begin()
+
+			// 创建新表（没有旧约束）
+			err = tx.Exec(`
+				CREATE TABLE client_traffics_new (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					inbound_id INTEGER NOT NULL DEFAULT 1,
+					enable INTEGER NOT NULL,
+					email TEXT NOT NULL,
+					up INTEGER NOT NULL,
+					down INTEGER NOT NULL,
+					all_time INTEGER NOT NULL,
+					expiry_time INTEGER NOT NULL,
+					total INTEGER NOT NULL,
+					reset INTEGER NOT NULL DEFAULT 0,
+					last_online INTEGER NOT NULL DEFAULT 0
+				)
+			`).Error
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to create new table: %v", err)
+				return err
+			}
+
+			// 复制数据
+			err = tx.Exec("INSERT INTO client_traffics_new SELECT id, inbound_id, enable, email, up, down, all_time, expiry_time, total, reset, last_online FROM client_traffics").Error
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to copy data: %v", err)
+				return err
+			}
+
+			// 删除旧表
+			err = tx.Exec("DROP TABLE client_traffics").Error
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to drop old table: %v", err)
+				return err
+			}
+
+			// 重命名新表
+			err = tx.Exec("ALTER TABLE client_traffics_new RENAME TO client_traffics").Error
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to rename table: %v", err)
+				return err
+			}
+
+			// 提交事务
+			if err = tx.Commit().Error; err != nil {
+				log.Printf("Failed to commit transaction: %v", err)
+				return err
+			}
+
+			log.Println("Table rebuilt successfully without old constraint")
+		}
 	}
 
 	// 检查联合唯一索引是否存在

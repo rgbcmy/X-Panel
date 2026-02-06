@@ -65,6 +65,8 @@ type AllSetting struct {
 	V2boardEnable               bool   `json:"v2boardEnable" form:"v2boardEnable"`
 	V2boardUrl                  string `json:"v2boardUrl" form:"v2boardUrl"`
 	V2boardToken                string `json:"v2boardToken" form:"v2boardToken"`
+	V2boardNodeId               string `json:"v2boardNodeId" form:"v2boardNodeId"`
+	V2boardNodeType             string `json:"v2boardNodeType" form:"v2boardNodeType"`
 }
 
 func (s *AllSetting) CheckValid() error {

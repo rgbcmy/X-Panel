@@ -48,11 +48,25 @@ type UserList struct {
 	Users []User `json:"users"`
 }
 
+type VlessConfig struct {
+	InboundPort        int      `json:"inbound_port"`
+	InboundTag         string   `json:"inbound_tag"`
+	RealityPrivateKey  string   `json:"reality_private_key"`
+	RealityPublicKey   string   `json:"reality_public_key"`
+	RealityShortId     string   `json:"reality_short_id"`
+	RealityDest        string   `json:"reality_dest"`
+	RealityServerNames []string `json:"reality_server_names"`
+	SpiderX            string   `json:"spider_x"`
+	Fingerprint        string   `json:"fingerprint"`
+	Flow               string   `json:"flow"`
+}
+
 type User struct {
-	Id         int    `json:"id"`
-	Uuid       string `json:"uuid"`
-	SpeedLimit int    `json:"speed_limit"`
-	Email      string `json:"email"`
+	Id          int          `json:"id"`
+	Uuid        string       `json:"uuid"`
+	SpeedLimit  int          `json:"speed_limit"`
+	Email       string       `json:"email"`
+	VlessConfig *VlessConfig `json:"vless_config,omitempty"`
 }
 
 type TrafficReport map[string][]int64

@@ -397,13 +397,26 @@ func (s *Server) Start() (err error) {
 		// 监听用户配置的地址
 		listenAddr = net.JoinHostPort(listen, strconv.Itoa(port))
 	} else {
-		// 方式二：未配置证书，强制监听在本地回环地址，仅供 SSH 转发使用
-		logger.Info("No certificate configured. Forcing listen address to localhost for security.")
-		logger.Info("Access is only possible via SSH tunnel (e.g., http://127.0.0.1).")
+		// 方式二：未配置证书的处理
+		// 在调试模式下允许监听所有地址，生产环境强制localhost
+		isDebug := config.IsDebug()
+		debugEnv := os.Getenv("XUI_DEBUG")
+		logger.Infof("Debug mode check - XUI_DEBUG env: '%s', IsDebug(): %v", debugEnv, isDebug)
 
-		// 无论用户在 listen 中填写什么，都强制使用回环地址
-		listen = fallbackToLocalhost(listen)
-		listenAddr = net.JoinHostPort(listen, strconv.Itoa(port))
+		if isDebug {
+			logger.Info("Debug mode enabled: allowing listen on configured address without certificate.")
+			logger.Warning("Warning: HTTP without certificate is insecure. Set XUI_DEBUG=false in production.")
+			listenAddr = net.JoinHostPort(listen, strconv.Itoa(port))
+		} else {
+			// 生产环境：强制监听在本地回环地址，仅供 SSH 转发使用
+			logger.Info("Production mode: No certificate configured. Forcing listen address to localhost for security.")
+			logger.Info("Access is only possible via SSH tunnel (e.g., http://127.0.0.1).")
+			logger.Info("To allow remote access without certificate, set XUI_DEBUG=true environment variable (development only).")
+
+			// 无论用户在 listen 中填写什么，都强制使用回环地址
+			listen = fallbackToLocalhost(listen)
+			listenAddr = net.JoinHostPort(listen, strconv.Itoa(port))
+		}
 	}
 
 	// 1. 使用 baseListener 临时变量接收 net.Listen 的结果，这是底层的 TCP 监听器

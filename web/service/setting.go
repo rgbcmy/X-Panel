@@ -75,6 +75,8 @@ var defaultValueMap = map[string]string{
 	"v2boardEnable":               "false",
 	"v2boardUrl":                  "",
 	"v2boardToken":                "",
+	"v2boardNodeId":               "",
+	"v2boardNodeType":             "v2ray",
 }
 
 type SettingService struct{}

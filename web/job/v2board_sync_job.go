@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"x-ui/database/model"
 	"x-ui/logger"
@@ -31,110 +32,252 @@ func (j *V2boardSyncJob) Run() {
 		return
 	}
 
-	// Get all inbounds
-	inbounds, err := j.inboundService.GetAllInbounds()
+	// 新策略: 获取用户列表，为每个有vless_config的用户创建/更新inbound
+	err = j.syncUserDrivenInbounds(allSetting)
 	if err != nil {
-		logger.Warning("get all inbounds failed:", err)
-		return
+		logger.Warning("sync user-driven inbounds failed:", err)
+	}
+}
+
+// syncUserDrivenInbounds 用户驱动模式：为每个用户创建专属inbound
+func (j *V2boardSyncJob) syncUserDrivenInbounds(allSetting *entity.AllSetting) error {
+	// 获取用户列表，使用全局配置的nodeId和nodeType
+	userList, err := j.v2boardService.GetUserList(allSetting, allSetting.V2boardNodeId, allSetting.V2boardNodeType)
+	if err != nil {
+		return fmt.Errorf("failed to get user list: %w", err)
 	}
 
-	// Sync users for each inbound that has v2board enabled
-	for _, inbound := range inbounds {
-		if !inbound.Enable || !inbound.V2boardEnabled || inbound.V2boardNodeId == "" {
+	logger.Info("V2board sync: processing", len(userList.Users), "users")
+
+	// 统计处理结果
+	processedCount := 0
+	skippedCount := 0
+	errorCount := 0
+
+	// 遍历用户列表
+	for _, user := range userList.Users {
+		// 只处理有vless_config的用户
+		if user.VlessConfig == nil {
+			logger.Debug("user", user.Id, "has no vless_config, skipping")
+			skippedCount++
 			continue
 		}
 
-		err = j.syncInboundUsers(inbound, allSetting)
+		err := j.processUserInbound(&user, allSetting)
 		if err != nil {
-			logger.Warning("sync users for inbound", inbound.Id, "failed:", err)
+			logger.Warning("failed to process inbound for user", user.Id, ":", err)
+			errorCount++
+			continue
 		}
+
+		logger.Info("successfully processed inbound for user", user.Id, "tag:", user.VlessConfig.InboundTag)
+		processedCount++
 	}
+
+	logger.Info("V2board sync completed: processed", processedCount, "users, skipped", skippedCount, "users, errors", errorCount)
+	return nil
 }
 
-func (j *V2boardSyncJob) syncInboundUsers(inbound *model.Inbound, allSetting *entity.AllSetting) error {
-	// Get user list from v2board for this specific node
-	userList, err := j.v2boardService.GetUserList(allSetting, inbound.V2boardNodeId, inbound.V2boardNodeType)
-	if err != nil {
-		return err
+// processUserInbound 为单个用户创建或更新inbound
+func (j *V2boardSyncJob) processUserInbound(user *service.User, allSetting *entity.AllSetting) error {
+	config := user.VlessConfig
+	if config == nil {
+		return fmt.Errorf("user has no vless_config")
 	}
 
-	// Get current clients for this inbound
+	// 查找是否已存在该tag的inbound
+	existingInbound, err := j.getInboundByTag(config.InboundTag)
+	if err != nil && err.Error() != "record not found" {
+		return fmt.Errorf("failed to query inbound by tag: %w", err)
+	}
+
+	if existingInbound != nil {
+		// 更新现有inbound
+		return j.updateUserInbound(existingInbound, user)
+	}
+
+	// 创建新inbound
+	return j.createUserInbound(user)
+}
+
+// getInboundByTag 根据tag查找inbound
+func (j *V2boardSyncJob) getInboundByTag(tag string) (*model.Inbound, error) {
+	allInbounds, err := j.inboundService.GetAllInbounds()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, inbound := range allInbounds {
+		if inbound.Tag == tag {
+			return inbound, nil
+		}
+	}
+
+	return nil, fmt.Errorf("record not found")
+}
+
+// createUserInbound 为用户创建新的inbound
+func (j *V2boardSyncJob) createUserInbound(user *service.User) error {
+	config := user.VlessConfig
+
+	// 构建客户端配置
+	client := model.Client{
+		ID:         user.Uuid,
+		Email:      user.Email,
+		Enable:     true,
+		ExpiryTime: 0,
+		TotalGB:    0,
+		LimitIP:    0,
+		SpeedLimit: user.SpeedLimit,
+		Flow:       config.Flow,
+	}
+
+	// 构建VLESS settings
+	settings := model.VLESSSettings{
+		Clients:    []model.Client{client},
+		Decryption: "none",
+	}
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	// 构建Reality streamSettings
+	// 注意：字段名需要与前端期望的格式一致，参考 web/assets/js/model/inbound.js RealityStreamSettings
+	streamSettings := map[string]interface{}{
+		"network":  "tcp",
+		"security": "reality",
+		"realitySettings": map[string]interface{}{
+			"show":         false,
+			"target":       config.RealityDest + ":443", // 使用target而不是dest，包含端口
+			"xver":         0,
+			"serverNames":  config.RealityServerNames,
+			"privateKey":   config.RealityPrivateKey,
+			"minClientVer": "",
+			"maxClientVer": "",
+			"maxTimediff":  0,
+			"shortIds":     []string{config.RealityShortId},
+			"mldsa65Seed":  "",
+			"settings": map[string]interface{}{
+				"publicKey":   config.RealityPublicKey,
+				"fingerprint": config.Fingerprint,
+				"serverName":  "",
+				"spiderX":     config.SpiderX,
+			},
+		},
+	}
+	streamSettingsJSON, err := json.Marshal(streamSettings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stream settings: %w", err)
+	}
+
+	// 构建sniffing配置
+	sniffing := map[string]interface{}{
+		"enabled":      true,
+		"destOverride": []string{"http", "tls", "quic"},
+	}
+	sniffingJSON, err := json.Marshal(sniffing)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sniffing: %w", err)
+	}
+
+	// 创建inbound对象
+	inbound := &model.Inbound{
+		UserId:         1, // 设置为管理员用户ID，使其在面板中可见
+		Enable:         true,
+		Remark:         fmt.Sprintf("V2Board User %d - %s", user.Id, user.Email),
+		Listen:         "",
+		Port:           config.InboundPort,
+		Protocol:       model.VLESS,
+		Settings:       string(settingsJSON),
+		StreamSettings: string(streamSettingsJSON),
+		Tag:            config.InboundTag,
+		Sniffing:       string(sniffingJSON),
+		// V2Board标记
+		V2boardEnabled:  true,
+		V2boardNodeId:   fmt.Sprintf("user-%d", user.Id),
+		V2boardNodeType: "vless",
+	}
+
+	// 添加到数据库
+	_, _, err = j.inboundService.AddInbound(inbound)
+	if err != nil {
+		return fmt.Errorf("failed to add inbound: %w", err)
+	}
+
+	logger.Info("created new inbound for user", user.Id, "port:", config.InboundPort, "tag:", config.InboundTag)
+	return nil
+}
+
+// updateUserInbound 更新现有inbound的用户配置
+func (j *V2boardSyncJob) updateUserInbound(inbound *model.Inbound, user *service.User) error {
+	// 获取当前客户端列表
 	currentClients, err := j.inboundService.GetClients(inbound)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get clients: %w", err)
 	}
 
-	// Create a map of existing clients by email
-	existingClients := make(map[string]*model.Client)
+	// 查找是否已存在该用户
+	userExists := false
 	for i, client := range currentClients {
-		existingClients[client.Email] = &currentClients[i]
-	}
-
-	// Sync users - add new clients or update existing ones
-	updatedClients := make([]model.Client, 0)
-	for _, user := range userList.Users {
-		client, exists := existingClients[user.Email]
-
-		if !exists {
-			// Create new client
-			newClient := model.Client{
-				ID:         user.Uuid, // Use UUID from v2board
-				Email:      user.Email,
-				Enable:     true,
-				ExpiryTime: 0, // No expiry
-				TotalGB:    0, // Unlimited
-				LimitIP:    0, // No limit
-				SpeedLimit: user.SpeedLimit,
-				//set default flow
-				Flow: "xtls-rprx-vision",
-			}
-			updatedClients = append(updatedClients, newClient)
-			logger.Info("added new client for user", user.Id, "in inbound", inbound.Id)
-		} else {
-			// Update existing client
-			client.Enable = true
-			client.SpeedLimit = user.SpeedLimit
-			updatedClients = append(updatedClients, *client)
+		if client.Email == user.Email || client.ID == user.Uuid {
+			// 更新现有客户端
+			currentClients[i].ID = user.Uuid
+			currentClients[i].Email = user.Email
+			currentClients[i].Enable = true
+			currentClients[i].SpeedLimit = user.SpeedLimit
+			currentClients[i].Flow = user.VlessConfig.Flow
+			userExists = true
+			break
 		}
 	}
 
-	// Disable clients not in V2board list
-	v2boardEmails := make(map[string]bool)
-	for _, user := range userList.Users {
-		v2boardEmails[user.Email] = true
-	}
-
-	for _, client := range currentClients {
-		if !v2boardEmails[client.Email] {
-			client.Enable = false
-			updatedClients = append(updatedClients, client)
-			logger.Info("disabled client", client.Email, "in inbound", inbound.Id, "as not in V2board")
+	// 如果用户不存在，添加新客户端
+	if !userExists {
+		newClient := model.Client{
+			ID:         user.Uuid,
+			Email:      user.Email,
+			Enable:     true,
+			ExpiryTime: 0,
+			TotalGB:    0,
+			LimitIP:    0,
+			SpeedLimit: user.SpeedLimit,
+			Flow:       user.VlessConfig.Flow,
 		}
+		currentClients = append(currentClients, newClient)
+		logger.Info("added new client to existing inbound", inbound.Tag, "for user", user.Id)
+	} else {
+		logger.Debug("updated existing client in inbound", inbound.Tag, "for user", user.Id)
 	}
 
-	// Update inbound settings with new client list
-	return j.updateInboundClients(inbound, updatedClients)
+	// 更新inbound配置
+	return j.updateInboundClients(inbound, currentClients)
 }
 
+// updateInboundClients 更新inbound的客户端列表
 func (j *V2boardSyncJob) updateInboundClients(inbound *model.Inbound, clients []model.Client) error {
-	// Parse current settings
+	// 解析当前settings
 	var settings map[string]interface{}
 	if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
-	// Update clients
+	// 更新客户端列表
 	settings["clients"] = clients
 
-	// Serialize back to JSON
+	// 序列化回JSON
 	updatedSettings, err := json.Marshal(settings)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
 	inbound.Settings = string(updatedSettings)
 
-	// Update inbound in database
+	// 更新数据库
 	_, _, err = j.inboundService.UpdateInbound(inbound)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to update inbound: %w", err)
+	}
+
+	return nil
 }

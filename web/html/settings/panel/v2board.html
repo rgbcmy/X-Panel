@@ -22,9 +22,23 @@
                 <a-input-password v-model="allSetting.v2boardToken" placeholder="Enter API token"></a-input-password>
             </template>
         </a-setting-list-item>
+        <a-setting-list-item paddings="small">
+            <template #title>Node ID</template>
+            <template #description>The node ID in v2board for user synchronization (leave empty to sync all nodes)</template>
+            <template #control>
+                <a-input type="text" v-model="allSetting.v2boardNodeId" placeholder="1"></a-input>
+            </template>
+        </a-setting-list-item>
+        <a-setting-list-item paddings="small">
+            <template #title>Node Type</template>
+            <template #description>The node type for user synchronization (v2ray, shadowsocks, trojan, etc.)</template>
+            <template #control>
+                <a-input type="text" v-model="allSetting.v2boardNodeType" placeholder="v2ray"></a-input>
+            </template>
+        </a-setting-list-item>
         <a-alert type="info" :style="{ marginTop: '16px' }">
             <template #message>
-                <strong>Note:</strong> Node-specific settings (Node ID, Node Type) are configured per inbound in the inbounds page.
+                <strong>Note:</strong> Node ID and Node Type are used for fetching users from v2board. Each user with vless_config will get a dedicated inbound automatically created.
             </template>
         </a-alert>
     </a-collapse-panel>

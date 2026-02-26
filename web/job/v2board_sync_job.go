@@ -96,7 +96,19 @@ func (j *V2boardSyncJob) processUserInbound(user *service.User, allSetting *enti
 		return j.updateUserInbound(existingInbound, user)
 	}
 
-	// 创建新inbound
+	// 标签未找到，再通过端口查找（多用户共享同一端口的场景）
+	portInbound, err := j.getInboundByPort(config.InboundPort)
+	if err != nil && err.Error() != "record not found" {
+		return fmt.Errorf("failed to query inbound by port: %w", err)
+	}
+
+	if portInbound != nil {
+		// 端口已被占用，将用户加入该inbound
+		logger.Info("port", config.InboundPort, "already in use by inbound", portInbound.Tag, "- adding user", user.Id, "as client")
+		return j.updateUserInbound(portInbound, user)
+	}
+
+	// 标签和端口均未匹配，创建新inbound
 	return j.createUserInbound(user)
 }
 
@@ -109,6 +121,22 @@ func (j *V2boardSyncJob) getInboundByTag(tag string) (*model.Inbound, error) {
 
 	for _, inbound := range allInbounds {
 		if inbound.Tag == tag {
+			return inbound, nil
+		}
+	}
+
+	return nil, fmt.Errorf("record not found")
+}
+
+// getInboundByPort 根据端口查找inbound
+func (j *V2boardSyncJob) getInboundByPort(port int) (*model.Inbound, error) {
+	allInbounds, err := j.inboundService.GetAllInbounds()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, inbound := range allInbounds {
+		if inbound.Port == port {
 			return inbound, nil
 		}
 	}

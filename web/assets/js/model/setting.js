@@ -51,6 +51,8 @@ class AllSetting {
         this.v2boardEnable = false;
         this.v2boardUrl = "";
         this.v2boardToken = "";
+        this.v2boardNodeId = "";
+        this.v2boardNodeType = "";
 
         if (data == null) {
             return

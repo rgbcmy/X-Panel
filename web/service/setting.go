@@ -202,6 +202,11 @@ func (s *SettingService) saveSetting(key string, value string) error {
 }
 
 func (s *SettingService) getString(key string) (string, error) {
+	// 特殊处理 xrayTemplateConfig：直接从内嵌资源返回，不查询数据库
+	if key == "xrayTemplateConfig" {
+		return xrayTemplateConfig, nil
+	}
+
 	setting, err := s.getSetting(key)
 	if database.IsNotFound(err) {
 		value, ok := defaultValueMap[key]

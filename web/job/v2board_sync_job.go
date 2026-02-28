@@ -172,6 +172,10 @@ func (j *V2boardSyncJob) createUserInbound(user *service.User) error {
 
 	// 构建Reality streamSettings
 	// 注意：字段名需要与前端期望的格式一致，参考 web/assets/js/model/inbound.js RealityStreamSettings
+	serverName := ""
+	if len(config.RealityServerNames) > 0 {
+		serverName = config.RealityServerNames[0]
+	}
 	streamSettings := map[string]interface{}{
 		"network":  "tcp",
 		"security": "reality",
@@ -189,7 +193,7 @@ func (j *V2boardSyncJob) createUserInbound(user *service.User) error {
 			"settings": map[string]interface{}{
 				"publicKey":   config.RealityPublicKey,
 				"fingerprint": config.Fingerprint,
-				"serverName":  "",
+				"serverName":  serverName,
 				"spiderX":     config.SpiderX,
 			},
 		},

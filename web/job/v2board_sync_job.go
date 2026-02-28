@@ -85,15 +85,109 @@ func (j *V2boardSyncJob) processUserInbound(user *service.User, allSetting *enti
 		return fmt.Errorf("user has no vless_config")
 	}
 
-	// 查找是否已存在该tag的inbound
-	existingInbound, err := j.getInboundByTag(config.InboundTag)
-	if err != nil && err.Error() != "record not found" {
-		return fmt.Errorf("failed to query inbound by tag: %w", err)
+	// 只用remark查找是否已存在inbound
+	remark := fmt.Sprintf("V2Board User %d - %s", user.Id, user.Email)
+	var existingInbound *model.Inbound
+	var err error
+	if remark != "" {
+		existingInbound, err = j.getInboundByRemark(remark)
+		if err != nil && err.Error() != "record not found" {
+			return fmt.Errorf("failed to query inbound by remark: %w", err)
+		}
+		if existingInbound != nil && existingInbound.Remark == "" {
+			existingInbound = nil
+		}
 	}
 
 	if existingInbound != nil {
-		// 更新现有inbound
-		return j.updateUserInbound(existingInbound, user)
+		// 检查inbound属性是否有变化（端口、stream settings、sniffing等）
+		configChanged := false
+
+		// 1. 检查端口
+		if existingInbound.Port != config.InboundPort {
+			existingInbound.Port = config.InboundPort
+			configChanged = true
+		}
+
+		// 2. 检查StreamSettings
+		serverName := ""
+		if len(config.RealityServerNames) > 0 {
+			serverName = config.RealityServerNames[0]
+		}
+		newStreamSettings := map[string]interface{}{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]interface{}{
+				"show":         false,
+				"target":       config.RealityDest + ":443",
+				"xver":         0,
+				"serverNames":  config.RealityServerNames,
+				"privateKey":   config.RealityPrivateKey,
+				"minClientVer": "",
+				"maxClientVer": "",
+				"maxTimediff":  0,
+				"shortIds":     []string{config.RealityShortId},
+				"mldsa65Seed":  "",
+				"settings": map[string]interface{}{
+					"publicKey":   config.RealityPublicKey,
+					"fingerprint": config.Fingerprint,
+					"serverName":  serverName,
+					"spiderX":     config.SpiderX,
+				},
+			},
+		}
+		newStreamSettingsJSON, _ := json.Marshal(newStreamSettings)
+		if existingInbound.StreamSettings != string(newStreamSettingsJSON) {
+			existingInbound.StreamSettings = string(newStreamSettingsJSON)
+			configChanged = true
+		}
+
+		// 3. 检查Sniffing
+		newSniffing := map[string]interface{}{
+			"enabled":      true,
+			"destOverride": []string{"http", "tls", "quic"},
+		}
+		newSniffingJSON, _ := json.Marshal(newSniffing)
+		if existingInbound.Sniffing != string(newSniffingJSON) {
+			existingInbound.Sniffing = string(newSniffingJSON)
+			configChanged = true
+		}
+
+		// 4. 检查Remark
+		newRemark := fmt.Sprintf("V2Board User %d - %s", user.Id, user.Email)
+		if existingInbound.Remark != newRemark {
+			existingInbound.Remark = newRemark
+			configChanged = true
+		}
+
+		// 5. 检查V2board标记
+		newNodeId := fmt.Sprintf("user-%d", user.Id)
+		if existingInbound.V2boardNodeId != newNodeId {
+			existingInbound.V2boardNodeId = newNodeId
+			configChanged = true
+		}
+		if existingInbound.V2boardNodeType != "vless" {
+			existingInbound.V2boardNodeType = "vless"
+			configChanged = true
+		}
+		if !existingInbound.V2boardEnabled {
+			existingInbound.V2boardEnabled = true
+			configChanged = true
+		}
+
+		// 6. 更新用户信息和inbound属性
+		userErr := j.updateUserInbound(existingInbound, user)
+		if userErr != nil {
+			return userErr
+		}
+		if configChanged {
+			_, _, err := j.inboundService.UpdateInbound(existingInbound)
+			if err != nil {
+				return fmt.Errorf("failed to update inbound properties: %w", err)
+			}
+			logger.Info("updated inbound properties for user", user.Id, "tag:", config.InboundTag)
+		}
+		return nil
 	}
 
 	// 标签未找到，再通过端口查找（多用户共享同一端口的场景）
@@ -121,6 +215,22 @@ func (j *V2boardSyncJob) getInboundByTag(tag string) (*model.Inbound, error) {
 
 	for _, inbound := range allInbounds {
 		if inbound.Tag == tag {
+			return inbound, nil
+		}
+	}
+
+	return nil, fmt.Errorf("record not found")
+}
+
+// getInboundByRemark 根据remark查找inbound
+func (j *V2boardSyncJob) getInboundByRemark(remark string) (*model.Inbound, error) {
+	allInbounds, err := j.inboundService.GetAllInbounds()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, inbound := range allInbounds {
+		if inbound.Remark == remark {
 			return inbound, nil
 		}
 	}
@@ -246,7 +356,17 @@ func (j *V2boardSyncJob) updateUserInbound(inbound *model.Inbound, user *service
 	// 获取当前客户端列表
 	currentClients, err := j.inboundService.GetClients(inbound)
 	if err != nil {
+		logger.Error("failed to get clients for inbound", inbound.Tag, ":", err)
 		return fmt.Errorf("failed to get clients: %w", err)
+	}
+
+	if user == nil {
+		logger.Error("user is nil in updateUserInbound for inbound", inbound.Tag)
+		return fmt.Errorf("user is nil")
+	}
+	if user.VlessConfig == nil {
+		logger.Error("user.VlessConfig is nil for user", user.Id, "in updateUserInbound for inbound", inbound.Tag)
+		return fmt.Errorf("user.VlessConfig is nil")
 	}
 
 	// 查找是否已存在该用户
@@ -283,7 +403,11 @@ func (j *V2boardSyncJob) updateUserInbound(inbound *model.Inbound, user *service
 	}
 
 	// 更新inbound配置
-	return j.updateInboundClients(inbound, currentClients)
+	err = j.updateInboundClients(inbound, currentClients)
+	if err != nil {
+		logger.Error("updateInboundClients failed for inbound", inbound.Tag, ":", err)
+	}
+	return err
 }
 
 // updateInboundClients 更新inbound的客户端列表
@@ -291,6 +415,7 @@ func (j *V2boardSyncJob) updateInboundClients(inbound *model.Inbound, clients []
 	// 解析当前settings
 	var settings map[string]interface{}
 	if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+		logger.Error("failed to unmarshal inbound.Settings for inbound", inbound.Tag, ":", err, ", raw=", inbound.Settings)
 		return fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
@@ -300,6 +425,7 @@ func (j *V2boardSyncJob) updateInboundClients(inbound *model.Inbound, clients []
 	// 序列化回JSON
 	updatedSettings, err := json.Marshal(settings)
 	if err != nil {
+		logger.Error("failed to marshal updated settings for inbound", inbound.Tag, ":", err, ", settings=", settings)
 		return fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
@@ -308,6 +434,7 @@ func (j *V2boardSyncJob) updateInboundClients(inbound *model.Inbound, clients []
 	// 更新数据库
 	_, _, err = j.inboundService.UpdateInbound(inbound)
 	if err != nil {
+		logger.Error("failed to update inbound in DB for inbound", inbound.Tag, ":", err)
 		return fmt.Errorf("failed to update inbound: %w", err)
 	}
 

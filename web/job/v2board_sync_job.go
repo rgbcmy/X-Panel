@@ -160,14 +160,13 @@ func (j *V2boardSyncJob) processUserInbound(user *service.User, allSetting *enti
 			configChanged = true
 		}
 
-		// 5. 检查V2board标记
-		newNodeId := fmt.Sprintf("user-%d", user.Id)
-		if existingInbound.V2boardNodeId != newNodeId {
-			existingInbound.V2boardNodeId = newNodeId
+		// 5. 检查V2board标记 - 使用全局配置的NodeId和NodeType
+		if existingInbound.V2boardNodeId != allSetting.V2boardNodeId {
+			existingInbound.V2boardNodeId = allSetting.V2boardNodeId
 			configChanged = true
 		}
-		if existingInbound.V2boardNodeType != "vless" {
-			existingInbound.V2boardNodeType = "vless"
+		if existingInbound.V2boardNodeType != allSetting.V2boardNodeType {
+			existingInbound.V2boardNodeType = allSetting.V2boardNodeType
 			configChanged = true
 		}
 		if !existingInbound.V2boardEnabled {
@@ -203,7 +202,7 @@ func (j *V2boardSyncJob) processUserInbound(user *service.User, allSetting *enti
 	}
 
 	// 标签和端口均未匹配，创建新inbound
-	return j.createUserInbound(user)
+	return j.createUserInbound(user, allSetting)
 }
 
 // getInboundByTag 根据tag查找inbound
@@ -255,7 +254,7 @@ func (j *V2boardSyncJob) getInboundByPort(port int) (*model.Inbound, error) {
 }
 
 // createUserInbound 为用户创建新的inbound
-func (j *V2boardSyncJob) createUserInbound(user *service.User) error {
+func (j *V2boardSyncJob) createUserInbound(user *service.User, allSetting *entity.AllSetting) error {
 	config := user.VlessConfig
 
 	// 构建客户端配置
@@ -335,10 +334,10 @@ func (j *V2boardSyncJob) createUserInbound(user *service.User) error {
 		StreamSettings: string(streamSettingsJSON),
 		Tag:            config.InboundTag,
 		Sniffing:       string(sniffingJSON),
-		// V2Board标记
+		// V2Board标记 - 使用全局配置的NodeId和NodeType
 		V2boardEnabled:  true,
-		V2boardNodeId:   fmt.Sprintf("user-%d", user.Id),
-		V2boardNodeType: "vless",
+		V2boardNodeId:   allSetting.V2boardNodeId,
+		V2boardNodeType: allSetting.V2boardNodeType,
 	}
 
 	// 添加到数据库
